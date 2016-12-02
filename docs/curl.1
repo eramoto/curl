@@ -1212,6 +1212,11 @@ effectively disables the proxy. Each name in this list is matched as either
 a domain which contains the hostname, or the hostname itself. For example,
 local.com would match local.com, local.com:80, and www.local.com, but not
 www.notlocal.com.  (Added in 7.19.4).
+
+This option does not override existing environment variables that disable
+the proxy. If there's an environment variable disabling a proxy, the list
+of hosts disabling the proxy is the combination of this option and it.
+
 .IP "--connect-to <host:port:connect-to-host:connect-to-port>"
 For a request to the given "host:port" pair, connect to
 "connect-to-host:connect-to-port" instead.
@@ -2312,6 +2317,16 @@ Sets the proxy server to use if no protocol-specific proxy is set.
 .IP "NO_PROXY <comma-separated list of hosts>"
 list of host names that shouldn't go through any proxy. If set to a asterisk
 \&'*' only, it matches all hosts.
+
+Since 7.52.0, this einvironment variable disable the proxy even if specify
+\fI--porxy\fP option. That is
+.B NO_PROXY=direct.example.com curl --proxy http://proxy.example.com
+.B http://direct.example.com
+accesses the target URL directly, and
+.B NO_PROXY=direct.example.com curl --proxy http://proxy.example.com
+.B http://somewhere.example.com
+accesses the target URL through proxy.
+
 .SH "PROXY PROTOCOL PREFIXES"
 Since curl version 7.21.7, the proxy string may be specified with a
 protocol:// prefix to specify alternative proxy protocols.
