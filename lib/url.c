@@ -4784,7 +4784,6 @@ static char *detect_proxy(struct connectdata *conn)
 {
   char *proxy = NULL;
 
-#ifndef CURL_DISABLE_HTTP
   /* If proxy was not specified, we check for default proxy environment
    * variables, to enable i.e Lynx compliance:
    *
@@ -4853,11 +4852,6 @@ static char *detect_proxy(struct connectdata *conn)
   } /* if(!check_noproxy(conn->host.name, no_proxy)) - it wasn't specified
        non-proxy */
   free(no_proxy);
-
-#else /* !CURL_DISABLE_HTTP */
-
-  (void)conn;
-#endif /* CURL_DISABLE_HTTP */
 
   return proxy;
 }
@@ -6173,7 +6167,11 @@ static CURLcode create_conn(struct Curl_easy *data,
     Curl_safefree(socksproxy);
   }
   else if(!proxy && !socksproxy)
+#ifndef CURL_DISABLE_HTTP
     proxy = detect_proxy(conn);
+#else  /* !CURL_DISABLE_HTTP */
+    proxy = NULL;
+#endif /* CURL_DISABLE_HTTP */
 
   Curl_safefree(no_proxy);
 
