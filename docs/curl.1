@@ -1246,6 +1246,10 @@ a domain which contains the hostname, or the hostname itself. For example,
 local.com would match local.com, local.com:80, and www.local.com, but not
 www.notlocal.com.
 
+Since 7.52.0, This option overrides the environment variables that disable
+the proxy. If there's an environment variable disabling a proxy, you can set
+noproxy list to \&"" to override it.
+
 Added in 7.19.4.
 .IP "--ntlm-wb"
 (HTTP) Enables NTLM much in the style \fI--ntlm\fP does, but hand over the authentication
@@ -2468,11 +2472,11 @@ list of host names that shouldn't go through any proxy. If set to a asterisk
 \&'*' only, it matches all hosts.
 
 Since 7.52.0, this environment variable disable the proxy even if specify
-\fI--proxy\fP option. That is
-.B NO_PROXY=direct.example.com curl --proxy http://proxy.example.com
+\fI-x, --proxy\fP option. That is
+.B NO_PROXY=direct.example.com curl -x http://proxy.example.com
 .B http://direct.example.com
 accesses the target URL directly, and
-.B NO_PROXY=direct.example.com curl --proxy http://proxy.example.com
+.B NO_PROXY=direct.example.com curl -x http://proxy.example.com
 .B http://somewhere.example.com
 accesses the target URL through proxy.
 
