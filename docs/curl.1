@@ -1213,9 +1213,9 @@ a domain which contains the hostname, or the hostname itself. For example,
 local.com would match local.com, local.com:80, and www.local.com, but not
 www.notlocal.com.  (Added in 7.19.4).
 
-This option does not override existing environment variables that disable
-the proxy. If there's an environment variable disabling a proxy, the list
-of hosts disabling the proxy is the combination of this option and it.
+Since 7.52.0, This option overrides the environment variables that disable
+the proxy. If there's an environment variable disabling a proxy, you can set
+noproxy list to \&"" to override it.
 
 .IP "--connect-to <host:port:connect-to-host:connect-to-port>"
 For a request to the given "host:port" pair, connect to
