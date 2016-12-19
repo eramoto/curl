@@ -6147,10 +6147,8 @@ static CURLcode create_conn(struct Curl_easy *data,
   if(!no_proxy)
     no_proxy = curl_getenv("NO_PROXY");
 
-  if((data->set.str[STRING_NOPROXY] &&
-      check_noproxy(conn->host.name, data->set.str[STRING_NOPROXY])) ||
+  if(check_noproxy(conn->host.name, data->set.str[STRING_NOPROXY]) ||
      (!data->set.str[STRING_NOPROXY] &&
-      no_proxy &&
       check_noproxy(conn->host.name, no_proxy))) {
     Curl_safefree(proxy);
     Curl_safefree(socksproxy);
