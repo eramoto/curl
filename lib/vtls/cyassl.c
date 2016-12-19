@@ -397,7 +397,7 @@ cyassl_connect_step1(struct connectdata *conn,
         return CURLE_SSL_CONNECT_ERROR;
       }
       /* Informational message */
-      infof (data, "SSL re-using session ID\n");
+      infof(data, "SSL re-using session ID\n");
     }
     Curl_ssl_sessionid_unlock(conn);
   }
@@ -424,6 +424,9 @@ cyassl_connect_step2(struct connectdata *conn,
     conn->host.name;
   const char * const dispname = SSL_IS_PROXY() ?
     conn->http_proxy.host.dispname : conn->host.dispname;
+  const char * const pinnedpubkey = SSL_IS_PROXY() ?
+                        data->set.str[STRING_SSL_PINNEDPUBLICKEY_PROXY] :
+                        data->set.str[STRING_SSL_PINNEDPUBLICKEY_ORIG];
 
   conn->recv[sockindex] = cyassl_recv;
   conn->send[sockindex] = cyassl_send;
@@ -497,7 +500,7 @@ cyassl_connect_step2(struct connectdata *conn,
     }
   }
 
-  if(data->set.str[STRING_SSL_PINNEDPUBLICKEY]) {
+  if(pinnedpubkey) {
 #ifdef KEEP_PEER_CERT
     X509 *x509;
     const char *x509_der;
@@ -529,7 +532,7 @@ cyassl_connect_step2(struct connectdata *conn,
     }
 
     result = Curl_pin_peer_pubkey(data,
-                                  data->set.str[STRING_SSL_PINNEDPUBLICKEY],
+                                  pinnedpubkey,
                                   (const unsigned char *)pubkey->header,
                                   (size_t)(pubkey->end - pubkey->header));
     if(result) {
@@ -666,11 +669,11 @@ void Curl_cyassl_close(struct connectdata *conn, int sockindex)
 
   if(conssl->handle) {
     (void)SSL_shutdown(conssl->handle);
-    SSL_free (conssl->handle);
+    SSL_free(conssl->handle);
     conssl->handle = NULL;
   }
   if(conssl->ctx) {
-    SSL_CTX_free (conssl->ctx);
+    SSL_CTX_free(conssl->ctx);
     conssl->ctx = NULL;
   }
 }
@@ -752,7 +755,7 @@ int Curl_cyassl_shutdown(struct connectdata *conn, int sockindex)
   struct ssl_connect_data *connssl = &conn->ssl[sockindex];
 
   if(connssl->handle) {
-    SSL_free (connssl->handle);
+    SSL_free(connssl->handle);
     connssl->handle = NULL;
   }
   return retval;

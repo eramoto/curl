@@ -201,7 +201,7 @@ static CURLcode glob_range(URLGlob *glob, char **patternp,
         unsigned long lstep;
         errno = 0;
         lstep = strtoul(&pattern[4], &endp, 10);
-        if(errno || (*endp != ']'))
+        if(errno || &pattern[4] == endp || *endp != ']')
           step = -1;
         else {
           pattern = endp+1;
@@ -516,7 +516,7 @@ CURLcode glob_next_url(char **globbed, URLGlob *glob)
     for(i = 0; carry && (i < glob->size); i++) {
       carry = FALSE;
       pat = &glob->pattern[glob->size - 1 - i];
-      switch (pat->type) {
+      switch(pat->type) {
       case UPTSet:
         if((pat->content.Set.elements) &&
            (++pat->content.Set.ptr_s == pat->content.Set.size)) {
@@ -631,7 +631,7 @@ CURLcode glob_match_url(char **result, char *filename, URLGlob *glob)
       }
 
       if(pat) {
-        switch (pat->type) {
+        switch(pat->type) {
         case UPTSet:
           if(pat->content.Set.elements) {
             appendthis = pat->content.Set.elements[pat->content.Set.ptr_s];

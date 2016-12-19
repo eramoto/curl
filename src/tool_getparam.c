@@ -246,8 +246,6 @@ static const struct LongShort aliases[]= {
   {"E7", "proxy-capath",             TRUE},
   {"E8", "proxy-insecure",           FALSE},
   {"E9", "proxy-tlsv1",              FALSE},
-  {"EA", "proxy-sslv2",              FALSE},
-  {"EB", "proxy-sslv3",              FALSE},
   {"f",  "fail",                     FALSE},
   {"fa", "fail-early",               FALSE},
   {"F",  "form",                     TRUE},
@@ -292,6 +290,7 @@ static const struct LongShort aliases[]= {
   {"V",  "version",                  FALSE},
   {"w",  "write-out",                TRUE},
   {"x",  "proxy",                    TRUE},
+  {"xa", "preproxy",                 TRUE},
   {"X",  "request",                  TRUE},
   {"Y",  "speed-limit",              TRUE},
   {"y",  "speed-time",               TRUE},
@@ -759,7 +758,11 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
       case '@': /* the URL! */
       {
         struct getout *url;
-        if(config->url_get || ((config->url_get = config->url_list) != NULL)) {
+
+        if(!config->url_get)
+          config->url_get = config->url_list;
+
+        if(config->url_get) {
           /* there's a node here, if it already is filled-in continue to find
              an "empty" node */
           while(config->url_get && (config->url_get->flags & GETOUT_URL))
@@ -787,7 +790,7 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
       break;
     case '$': /* more options without a short option */
       switch(subletter) {
-      case 'a': /* --ftp-ssl */
+      case 'a': /* --ssl */
         if(toggle && !(curlinfo->features & CURL_VERSION_SSL))
           return PARAM_LIBCURL_DOESNT_SUPPORT;
         config->ftp_ssl = toggle;
@@ -797,21 +800,21 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
         break;
       case 'c': /* --socks5 specifies a socks5 proxy to use, and resolves
                    the name locally and passes on the resolved address */
-        GetStr(&config->socksproxy, nextarg);
-        config->socksver = CURLPROXY_SOCKS5;
+        GetStr(&config->proxy, nextarg);
+        config->proxyver = CURLPROXY_SOCKS5;
         break;
       case 't': /* --socks4 specifies a socks4 proxy to use */
-        GetStr(&config->socksproxy, nextarg);
-        config->socksver = CURLPROXY_SOCKS4;
+        GetStr(&config->proxy, nextarg);
+        config->proxyver = CURLPROXY_SOCKS4;
         break;
       case 'T': /* --socks4a specifies a socks4a proxy to use */
-        GetStr(&config->socksproxy, nextarg);
-        config->socksver = CURLPROXY_SOCKS4A;
+        GetStr(&config->proxy, nextarg);
+        config->proxyver = CURLPROXY_SOCKS4A;
         break;
       case '2': /* --socks5-hostname specifies a socks5 proxy and enables name
                    resolving with the proxy */
-        GetStr(&config->socksproxy, nextarg);
-        config->socksver = CURLPROXY_SOCKS5_HOSTNAME;
+        GetStr(&config->proxy, nextarg);
+        config->proxyver = CURLPROXY_SOCKS5_HOSTNAME;
         break;
       case 'd': /* --tcp-nodelay option */
         config->tcp_nodelay = toggle;
@@ -885,7 +888,7 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
       case 'u': /* --ftp-alternative-to-user */
         GetStr(&config->ftp_alternative_to_user, nextarg);
         break;
-      case 'v': /* --ftp-ssl-reqd */
+      case 'v': /* --ssl-reqd */
         if(toggle && !(curlinfo->features & CURL_VERSION_SSL))
           return PARAM_LIBCURL_DOESNT_SUPPORT;
         config->ftp_ssl_reqd = toggle;
@@ -1542,16 +1545,6 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
         config->proxy_ssl_version = CURL_SSLVERSION_TLSv1;
         break;
 
-      case 'A':
-        /* SSL version 2 for proxy */
-        config->proxy_ssl_version = CURL_SSLVERSION_SSLv2;
-        break;
-
-      case 'B':
-        /* SSL version 3 for proxy */
-        config->proxy_ssl_version = CURL_SSLVERSION_SSLv3;
-        break;
-
       default: /* unknown flag */
         return PARAM_OPTION_UNKNOWN;
       }
@@ -1640,7 +1633,7 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
       break;
     case 'L':
       config->followlocation = toggle; /* Follow Location: HTTP headers */
-      switch (subletter) {
+      switch(subletter) {
       case 't':
         /* Continue to send authentication (user+password) when following
          * locations, even when hostname changed */
@@ -1699,7 +1692,9 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
       /* output file */
     {
       struct getout *url;
-      if(config->url_out || ((config->url_out = config->url_list) != NULL)) {
+      if(!config->url_out)
+        config->url_out = config->url_list;
+      if(config->url_out) {
         /* there's a node here, if it already is filled-in continue to find
            an "empty" node */
         while(config->url_out && (config->url_out->flags & GETOUT_OUTFILE))
@@ -1836,7 +1831,9 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
       /* we are uploading */
     {
       struct getout *url;
-      if(config->url_out || ((config->url_out = config->url_list) != NULL)) {
+      if(!config->url_out)
+        config->url_out = config->url_list;
+      if(config->url_out) {
         /* there's a node here, if it already is filled-in continue to find
            an "empty" node */
         while(config->url_out && (config->url_out->flags & GETOUT_UPLOAD))
@@ -1924,9 +1921,16 @@ ParameterError getparameter(char *flag,    /* f or -long-flag */
         GetStr(&config->writeout, nextarg);
       break;
     case 'x':
-      /* proxy */
-      GetStr(&config->proxy, nextarg);
-      config->proxyver = CURLPROXY_HTTP;
+      switch(subletter) {
+      case 'a': /* --preproxy */
+        GetStr(&config->preproxy, nextarg);
+        break;
+      default:
+        /* --proxy */
+        GetStr(&config->proxy, nextarg);
+        config->proxyver = CURLPROXY_HTTP;
+        break;
+      }
       break;
     case 'X':
       /* set custom request */

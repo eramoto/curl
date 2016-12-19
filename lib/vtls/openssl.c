@@ -905,11 +905,11 @@ static void ossl_close(struct ssl_connect_data *connssl)
     (void)SSL_shutdown(connssl->handle);
     SSL_set_connect_state(connssl->handle);
 
-    SSL_free (connssl->handle);
+    SSL_free(connssl->handle);
     connssl->handle = NULL;
   }
   if(connssl->ctx) {
-    SSL_CTX_free (connssl->ctx);
+    SSL_CTX_free(connssl->ctx);
     connssl->ctx = NULL;
   }
 }
@@ -1018,7 +1018,7 @@ int Curl_ossl_shutdown(struct connectdata *conn, int sockindex)
 #endif
     }
 
-    SSL_free (connssl->handle);
+    SSL_free(connssl->handle);
     connssl->handle = NULL;
   }
   return retval;
@@ -1416,7 +1416,7 @@ static const char *ssl_msg_type(int ssl_ver, int msg)
 {
 #ifdef SSL2_VERSION_MAJOR
   if(ssl_ver == SSL2_VERSION_MAJOR) {
-    switch (msg) {
+    switch(msg) {
       case SSL2_MT_ERROR:
         return "Error";
       case SSL2_MT_CLIENT_HELLO:
@@ -1440,7 +1440,7 @@ static const char *ssl_msg_type(int ssl_ver, int msg)
   else
 #endif
   if(ssl_ver == SSL3_VERSION_MAJOR) {
-    switch (msg) {
+    switch(msg) {
       case SSL3_MT_HELLO_REQUEST:
         return "Hello request";
       case SSL3_MT_CLIENT_HELLO:
@@ -2174,7 +2174,7 @@ static CURLcode ossl_connect_step1(struct connectdata *conn, int sockindex)
         return CURLE_SSL_CONNECT_ERROR;
       }
       /* Informational message */
-      infof (data, "SSL re-using session ID\n");
+      infof(data, "SSL re-using session ID\n");
     }
     Curl_ssl_sessionid_unlock(conn);
   }
@@ -2336,7 +2336,8 @@ static int asn1_object_dump(ASN1_OBJECT *a, char *buf, size_t len)
 {
   int i, ilen;
 
-  if((ilen = (int)len) < 0)
+  ilen = (int)len;
+  if(ilen < 0)
     return 1; /* buffer too big */
 
   i = i2t_ASN1_OBJECT(buf, ilen, a);
@@ -2891,7 +2892,8 @@ static CURLcode servercert(struct connectdata *conn,
     /* when not strict, we don't bother about the verify cert problems */
     result = CURLE_OK;
 
-  ptr = data->set.str[STRING_SSL_PINNEDPUBLICKEY];
+  ptr = SSL_IS_PROXY() ? data->set.str[STRING_SSL_PINNEDPUBLICKEY_PROXY] :
+                         data->set.str[STRING_SSL_PINNEDPUBLICKEY_ORIG];
   if(!result && ptr) {
     result = pkp_pin_peer_pubkey(data, connssl->server_cert, ptr);
     if(result)
@@ -3158,8 +3160,8 @@ static ssize_t ossl_send(struct connectdata *conn,
       /*  A failure in the SSL library occurred, usually a protocol error.
           The OpenSSL error queue contains more information on the error. */
       sslerror = ERR_get_error();
-      if(sslerror ==
-         ERR_PACK(ERR_LIB_SSL, SSL_F_SSL3_WRITE_PENDING, SSL_R_BIO_NOT_SET) &&
+      if(ERR_GET_LIB(sslerror) == ERR_LIB_SSL &&
+         ERR_GET_REASON(sslerror) == SSL_R_BIO_NOT_SET &&
          conn->ssl[sockindex].state == ssl_connection_complete &&
          conn->proxy_ssl[sockindex].state == ssl_connection_complete) {
         char ver[120];
@@ -3253,7 +3255,7 @@ size_t Curl_ossl_version(char *buffer, size_t size)
         sub[0] = 'z';
       }
       else {
-        sub[0]=(char)(((ssleay_value>>4)&0xff) + 'a' -1);
+        sub[0] = (char) (minor_ver + 'a' - 1);
       }
     }
     else

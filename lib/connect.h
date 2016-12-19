@@ -52,6 +52,11 @@ time_t Curl_timeleft(struct Curl_easy *data,
 curl_socket_t Curl_getconnectinfo(struct Curl_easy *data,
                                   struct connectdata **connp);
 
+/*
+ * Check if a connection seems to be alive.
+ */
+bool Curl_connalive(struct connectdata *conn);
+
 #ifdef USE_WINSOCK
 /* When you run a program that uses the Windows Sockets API, you may
    experience slow performance when you copy data to a TCP server.
@@ -136,5 +141,7 @@ void Curl_conncontrol(struct connectdata *conn,
 #define connclose(x,y) Curl_conncontrol(x, CONNCTRL_CONNECTION)
 #define connkeep(x,y) Curl_conncontrol(x, CONNCTRL_KEEP)
 #endif
+
+bool Curl_conn_data_pending(struct connectdata *conn, int sockindex);
 
 #endif /* HEADER_CURL_CONNECT_H */

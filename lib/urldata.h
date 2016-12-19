@@ -1280,6 +1280,11 @@ struct auth {
                    be RFC compliant */
 };
 
+struct Curl_http2_dep {
+  struct Curl_http2_dep *next;
+  struct Curl_easy *data;
+};
+
 struct UrlState {
 
   /* Points to the connection cache */
@@ -1463,7 +1468,7 @@ enum dupstring {
   STRING_NETRC_FILE,      /* if not NULL, use this instead of trying to find
                              $HOME/.netrc */
   STRING_PROXY,           /* proxy to use */
-  STRING_SOCKS_PROXY,     /* socks proxy to use */
+  STRING_PRE_PROXY,       /* pre socks proxy to use */
   STRING_SET_RANGE,       /* range, if used */
   STRING_SET_REFERER,     /* custom string for the HTTP referer field */
   STRING_SET_URL,         /* what original URL to work on */
@@ -1471,7 +1476,8 @@ enum dupstring {
   STRING_SSL_CAPATH_PROXY, /* CA directory name (doesn't work on windows) */
   STRING_SSL_CAFILE_ORIG, /* certificate file to verify peer against */
   STRING_SSL_CAFILE_PROXY, /* certificate file to verify peer against */
-  STRING_SSL_PINNEDPUBLICKEY, /* public key file to verify peer against */
+  STRING_SSL_PINNEDPUBLICKEY_ORIG, /* public key file to verify peer against */
+  STRING_SSL_PINNEDPUBLICKEY_PROXY, /* public key file to verify proxy */
   STRING_SSL_CIPHER_LIST_ORIG, /* list of ciphers to use */
   STRING_SSL_CIPHER_LIST_PROXY, /* list of ciphers to use */
   STRING_SSL_EGDSOCKET,   /* path to file containing the EGD daemon socket */
@@ -1746,6 +1752,8 @@ struct UserDefined {
   struct Curl_easy *stream_depends_on;
   bool stream_depends_e; /* set or don't set the Exclusive bit */
   int stream_weight;
+
+  struct Curl_http2_dep *stream_dependents;
 };
 
 struct Names {

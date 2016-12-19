@@ -640,7 +640,7 @@ typedef enum {
                            CONNECT HTTP/1.1 */
   CURLPROXY_HTTP_1_0 = 1,   /* added in 7.19.4, force to use CONNECT
                                HTTP/1.0  */
-  CURLPROXY_HTTPS = 2, /* added in TBD */
+  CURLPROXY_HTTPS = 2, /* added in 7.52.0 */
   CURLPROXY_SOCKS4 = 4, /* support added in 7.15.2, enum existed already
                            in 7.10 */
   CURLPROXY_SOCKS5 = 5, /* added in 7.10 */
@@ -1763,12 +1763,12 @@ typedef enum {
      CURLSSLOPT_* */
   CINIT(PROXY_SSL_OPTIONS, LONG, 261),
 
-  /* Name of socks proxy to use. */
-  CINIT(SOCKS_PROXY, STRINGPOINT, 262),
+  /* Name of pre proxy to use. */
+  CINIT(PRE_PROXY, STRINGPOINT, 262),
 
-  /* indicates type of proxy. accepted values are CURLPROXY_SOCKS4,
-     CURLPROXY_SOCKS4A and CURLPROXY_SOCKS5. */
-  CINIT(SOCKS_PROXYTYPE, LONG, 263),
+  /* The public key in DER form used to validate the proxy public key
+     this option is used only if PROXY_SSL_VERIFYPEER is true */
+  CINIT(PROXY_PINNEDPUBLICKEY, STRINGPOINT, 263),
 
   CURLOPT_LASTENTRY /* the last unused */
 } CURLoption;
@@ -1906,7 +1906,10 @@ typedef enum {
 
 
 /* curl_strequal() and curl_strnequal() are subject for removal in a future
-   libcurl, see lib/README.curlx for details */
+   libcurl, see lib/README.curlx for details
+
+   !checksrc! disable SPACEBEFOREPAREN 2
+*/
 CURL_EXTERN int (curl_strequal)(const char *s1, const char *s2);
 CURL_EXTERN int (curl_strnequal)(const char *s1, const char *s2, size_t n);
 
@@ -2442,6 +2445,7 @@ typedef struct {
 #define CURL_VERSION_UNIX_SOCKETS (1<<19) /* Unix domain sockets support */
 #define CURL_VERSION_PSL          (1<<20) /* Mozilla's Public Suffix List, used
                                              for cookie domain verification */
+#define CURL_VERSION_HTTPS_PROXY  (1<<21) /* HTTPS-proxy support built-in */
 
  /*
  * NAME curl_version_info()

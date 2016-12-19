@@ -653,7 +653,7 @@ static CURLcode operate_do(struct GlobalConfig *global,
           infd = -1;
           if(stat(uploadfile, &fileinfo) == 0) {
             fileinfo.st_size = VmsSpecialSize(uploadfile, &fileinfo);
-            switch (fileinfo.st_fab_rfm) {
+            switch(fileinfo.st_fab_rfm) {
             case FAB$C_VAR:
             case FAB$C_VFC:
             case FAB$C_STMCR:
@@ -858,21 +858,18 @@ static CURLcode operate_do(struct GlobalConfig *global,
           /* TODO: Make this a run-time check instead of compile-time one. */
 
           my_setopt_str(curl, CURLOPT_PROXY, config->proxy);
+          /* new in libcurl 7.5 */
+          if(config->proxy)
+            my_setopt_enum(curl, CURLOPT_PROXYTYPE, config->proxyver);
+
           my_setopt_str(curl, CURLOPT_PROXYUSERPWD, config->proxyuserpwd);
 
           /* new in libcurl 7.3 */
           my_setopt(curl, CURLOPT_HTTPPROXYTUNNEL, config->proxytunnel?1L:0L);
 
-          /* new in libcurl 7.5 */
-          if(config->proxy)
-            my_setopt_enum(curl, CURLOPT_PROXYTYPE, (long)config->proxyver);
-
-          /* new in libcurl 7.10 */
-          if(config->socksproxy) {
-            my_setopt_str(curl, CURLOPT_SOCKS_PROXY, config->socksproxy);
-            my_setopt_enum(curl, CURLOPT_SOCKS_PROXYTYPE,
-                           (long)config->socksver);
-          }
+          /* new in libcurl 7.52.0 */
+          if(config->preproxy)
+            my_setopt_str(curl, CURLOPT_PRE_PROXY, config->preproxy);
 
           /* new in libcurl 7.10.6 */
           if(config->proxyanyauth)

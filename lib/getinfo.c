@@ -5,7 +5,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2015, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) 1998 - 2016, Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -77,6 +77,9 @@ CURLcode Curl_initinfo(struct Curl_easy *data)
   info->conn_local_ip[0] = '\0';
   info->conn_primary_port = 0;
   info->conn_local_port = 0;
+
+  info->conn_scheme = 0;
+  info->conn_protocol = 0;
 
 #ifdef USE_SSL
   Curl_ssl_free_certinfo(data);
@@ -217,7 +220,7 @@ static CURLcode getinfo_long(struct Curl_easy *data, CURLINFO info,
     *param_longp = data->state.rtsp_CSeq_recv;
     break;
   case CURLINFO_HTTP_VERSION:
-    switch (data->info.httpversion) {
+    switch(data->info.httpversion) {
     case 10:
       *param_longp = CURL_HTTP_VERSION_1_0;
       break;

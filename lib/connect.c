@@ -194,7 +194,7 @@ time_t Curl_timeleft(struct Curl_easy *data,
   if(duringconnect && (data->set.connecttimeout > 0))
     timeout_set |= 2;
 
-  switch (timeout_set) {
+  switch(timeout_set) {
   case 1:
     timeout_ms = data->set.timeout;
     break;
@@ -620,7 +620,7 @@ static bool getaddressinfo(struct sockaddr *sa, char *addr,
   struct sockaddr_un *su = NULL;
 #endif
 
-  switch (sa->sa_family) {
+  switch(sa->sa_family) {
     case AF_INET:
       si = (struct sockaddr_in *)(void *) sa;
       if(Curl_inet_ntop(sa->sa_family, &si->sin_addr,
@@ -1247,29 +1247,38 @@ curl_socket_t Curl_getconnectinfo(struct Curl_easy *data,
       /* only store this if the caller cares for it */
       *connp = c;
     sockfd = c->sock[FIRSTSOCKET];
-    /* we have a socket connected, let's determine if the server shut down */
-    /* determine if ssl */
-    if(c->ssl[FIRSTSOCKET].use) {
-      /* use the SSL context */
-      if(!Curl_ssl_check_cxn(c))
-        return CURL_SOCKET_BAD;   /* FIN received */
-    }
-/* Minix 3.1 doesn't support any flags on recv; just assume socket is OK */
-#ifdef MSG_PEEK
-    else if(sockfd != CURL_SOCKET_BAD) {
-      /* use the socket */
-      char buf;
-      if(recv((RECV_TYPE_ARG1)sockfd, (RECV_TYPE_ARG2)&buf,
-              (RECV_TYPE_ARG3)1, (RECV_TYPE_ARG4)MSG_PEEK) == 0) {
-        return CURL_SOCKET_BAD;   /* FIN received */
-      }
-    }
-#endif
   }
   else
     return CURL_SOCKET_BAD;
 
   return sockfd;
+}
+
+/*
+ * Check if a connection seems to be alive.
+ */
+bool Curl_connalive(struct connectdata *conn)
+{
+  /* First determine if ssl */
+  if(conn->ssl[FIRSTSOCKET].use) {
+    /* use the SSL context */
+    if(!Curl_ssl_check_cxn(conn))
+      return false;   /* FIN received */
+  }
+/* Minix 3.1 doesn't support any flags on recv; just assume socket is OK */
+#ifdef MSG_PEEK
+  else if(conn->sock[FIRSTSOCKET] == CURL_SOCKET_BAD)
+    return false;
+  else {
+    /* use the socket */
+    char buf;
+    if(recv((RECV_TYPE_ARG1)conn->sock[FIRSTSOCKET], (RECV_TYPE_ARG2)&buf,
+            (RECV_TYPE_ARG3)1, (RECV_TYPE_ARG4)MSG_PEEK) == 0) {
+      return false;   /* FIN received */
+    }
+  }
+#endif
+  return true;
 }
 
 /*
@@ -1394,4 +1403,17 @@ void Curl_conncontrol(struct connectdata *conn,
     conn->bits.close = closeit; /* the only place in the source code that
                                    should assign this bit */
   }
+}
+
+/* Data received can be cached at various levels, so check them all here. */
+bool Curl_conn_data_pending(struct connectdata *conn, int sockindex)
+{
+  int readable;
+
+  if(Curl_ssl_data_pending(conn, sockindex) ||
+     Curl_recv_has_postponed_data(conn, sockindex))
+    return true;
+
+  readable = SOCKET_READABLE(conn->sock[sockindex], 0);
+  return (readable > 0 && (readable & CURL_CSELECT_IN));
 }

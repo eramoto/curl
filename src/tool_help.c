@@ -168,6 +168,7 @@ static const char *const helptext[] = {
   "Do not switch to GET after following a 302 redirect (H)",
   "     --post303       "
   "Do not switch to GET after following a 303 redirect (H)",
+  "     --preproxy [PROTOCOL://]HOST[:PORT] Proxy before HTTP(S) proxy",
   " -#, --progress-bar  Display transfer progress as a progress bar",
   "     --proto PROTOCOLS  Enable/disable PROTOCOLS",
   "     --proto-default PROTOCOL  Use PROTOCOL for any URL missing a scheme",
@@ -199,8 +200,6 @@ static const char *const helptext[] = {
   "     --proxy-pass PASS Pass phrase for the private key for proxy (SSL)",
   "     --proxy-ssl-allow-beast "
   "Allow security flaw to improve interop for proxy (SSL)",
-  "     --proxy-sslv2   Use SSLv2 for proxy (SSL)",
-  "     --proxy-sslv3   Use SSLv3 for proxy (SSL)",
   "     --proxy-tlsv1   Use TLSv1 for proxy (SSL)",
   "     --proxy-tlsuser USER TLS username for proxy",
   "     --proxy-tlspassword STRING TLS password for proxy",
@@ -225,8 +224,7 @@ static const char *const helptext[] = {
   "     --resolve HOST:PORT:ADDRESS  Force resolve of HOST:PORT to ADDRESS",
   "     --retry NUM   "
   "Retry request NUM times if transient problems occur",
-  "     --retry-connrefused  "
-  "Consider \"connection refused\" a transient error",
+  "     --retry-connrefused  Retry on connection refused (use with --retry)",
   "     --retry-delay SECONDS  Wait SECONDS between retries",
   "     --retry-max-time SECONDS  Retry only within this period",
   "     --sasl-ir       Enable initial response in SASL authentication",
@@ -318,6 +316,7 @@ static const struct feat feats[] = {
   {"TLS-SRP",        CURL_VERSION_TLSAUTH_SRP},
   {"HTTP2",          CURL_VERSION_HTTP2},
   {"UnixSockets",    CURL_VERSION_UNIX_SOCKETS},
+  {"HTTPS-proxy",    CURL_VERSION_HTTPS_PROXY}
 };
 
 void tool_help(void)

@@ -464,6 +464,7 @@ CURLcode Curl_close(struct Curl_easy *data)
   /* this destroys the channel and we cannot use it anymore after this */
   Curl_resolver_cleanup(data->state.resolver);
 
+  Curl_http2_cleanup_dependencies(data);
   Curl_convert_close(data);
 
   /* No longer a dirty share, if it exists */
@@ -528,7 +529,7 @@ CURLcode Curl_init_userdefined(struct UserDefined *set)
   /* Set the default size of the SSL session ID cache */
   set->general_ssl.max_ssl_sessions = 5;
 
-  set->proxyport = CURL_DEFAULT_PROXY_PORT; /* from url.h */
+  set->proxyport = 0;
   set->proxytype = CURLPROXY_HTTP; /* defaults to HTTP proxy */
   set->httpauth = CURLAUTH_BASIC;  /* defaults to basic */
   set->proxyauth = CURLAUTH_BASIC; /* defaults to basic */
@@ -1471,14 +1472,14 @@ CURLcode Curl_setopt(struct Curl_easy *data, CURLoption option,
                        va_arg(param, char *));
     break;
 
-  case CURLOPT_SOCKS_PROXY:
+  case CURLOPT_PRE_PROXY:
     /*
      * Set proxy server:port to use as SOCKS proxy.
      *
      * If the proxy is set to "" or NULL we explicitly say that we don't want
      * to use the socks proxy.
      */
-    result = setstropt(&data->set.str[STRING_SOCKS_PROXY],
+    result = setstropt(&data->set.str[STRING_PRE_PROXY],
                        va_arg(param, char *));
     break;
 
@@ -1489,18 +1490,11 @@ CURLcode Curl_setopt(struct Curl_easy *data, CURLoption option,
     data->set.proxytype = (curl_proxytype)va_arg(param, long);
     break;
 
-  case CURLOPT_SOCKS_PROXYTYPE:
-    /*
-     * Set proxy type. SOCKS4/SOCKS4a/SOCKS5/SOCKS5_HOSTNAME
-     */
-    data->set.socks_proxytype = (curl_proxytype)va_arg(param, long);
-    break;
-
   case CURLOPT_PROXY_TRANSFER_MODE:
     /*
      * set transfer mode (;type=<a|i>) when doing FTP via an HTTP proxy
      */
-    switch (va_arg(param, long)) {
+    switch(va_arg(param, long)) {
     case 0:
       data->set.proxy_transfer_mode = FALSE;
       break;
@@ -2181,7 +2175,19 @@ CURLcode Curl_setopt(struct Curl_easy *data, CURLoption option,
      * Set pinned public key for SSL connection.
      * Specify file name of the public key in DER format.
      */
-    result = setstropt(&data->set.str[STRING_SSL_PINNEDPUBLICKEY],
+    result = setstropt(&data->set.str[STRING_SSL_PINNEDPUBLICKEY_ORIG],
+                       va_arg(param, char *));
+#else
+    result = CURLE_NOT_BUILT_IN;
+#endif
+    break;
+  case CURLOPT_PROXY_PINNEDPUBLICKEY:
+#ifdef have_curlssl_pinnedpubkey /* only by supported backends */
+    /*
+     * Set pinned public key for SSL connection.
+     * Specify file name of the public key in DER format.
+     */
+    result = setstropt(&data->set.str[STRING_SSL_PINNEDPUBLICKEY_PROXY],
                        va_arg(param, char *));
 #else
     result = CURLE_NOT_BUILT_IN;
@@ -2835,9 +2841,11 @@ CURLcode Curl_setopt(struct Curl_easy *data, CURLoption option,
     return CURLE_NOT_BUILT_IN;
 #else
     struct Curl_easy *dep = va_arg(param, struct Curl_easy *);
-    if(dep && GOOD_EASY_HANDLE(dep)) {
-      data->set.stream_depends_on = dep;
-      data->set.stream_depends_e = (option == CURLOPT_STREAM_DEPENDS_E);
+    if(!dep || GOOD_EASY_HANDLE(dep)) {
+      if(data->set.stream_depends_on) {
+        Curl_http2_remove_child(data->set.stream_depends_on, data);
+      }
+      Curl_http2_add_child(dep, data, (option == CURLOPT_STREAM_DEPENDS_E));
     }
     break;
 #endif
@@ -2875,10 +2883,10 @@ static void conn_reset_postponed_data(struct connectdata *conn, int num)
 #endif /* DEBUGBUILD */
   }
   else {
-    DEBUGASSERT (psnd->allocated_size == 0);
-    DEBUGASSERT (psnd->recv_size == 0);
-    DEBUGASSERT (psnd->recv_processed == 0);
-    DEBUGASSERT (psnd->bindsock == CURL_SOCKET_BAD);
+    DEBUGASSERT(psnd->allocated_size == 0);
+    DEBUGASSERT(psnd->recv_size == 0);
+    DEBUGASSERT(psnd->recv_processed == 0);
+    DEBUGASSERT(psnd->bindsock == CURL_SOCKET_BAD);
   }
 }
 
@@ -4094,7 +4102,7 @@ static struct connectdata *allocate_conn(struct Curl_easy *data)
                         and the Curl_easy */
 
   conn->http_proxy.proxytype = data->set.proxytype;
-  conn->socks_proxy.proxytype = data->set.socks_proxytype;
+  conn->socks_proxy.proxytype = CURLPROXY_SOCKS4;
 
 #ifdef CURL_DISABLE_PROXY
 
@@ -4118,7 +4126,7 @@ static struct connectdata *allocate_conn(struct Curl_easy *data)
   conn->bits.socksproxy = (conn->bits.proxy &&
                            !conn->bits.httpproxy) ? TRUE : FALSE;
 
-  if(data->set.str[STRING_SOCKS_PROXY] && *data->set.str[STRING_SOCKS_PROXY]) {
+  if(data->set.str[STRING_PRE_PROXY] && *data->set.str[STRING_PRE_PROXY]) {
     conn->bits.proxy = TRUE;
     conn->bits.socksproxy = TRUE;
   }
@@ -4151,7 +4159,7 @@ static struct connectdata *allocate_conn(struct Curl_easy *data)
   if(Curl_pipeline_wanted(data->multi, CURLPIPE_HTTP1) &&
      !conn->master_buffer) {
     /* Allocate master_buffer to be used for HTTP/1 pipelining */
-    conn->master_buffer = calloc(BUFSIZE, sizeof (char));
+    conn->master_buffer = calloc(BUFSIZE, sizeof(char));
     if(!conn->master_buffer)
       goto error;
   }
@@ -4895,6 +4903,14 @@ static CURLcode parse_proxy(struct Curl_easy *data,
   else
     proxyptr = proxy; /* No xxx:// head: It's a HTTP proxy */
 
+#ifndef HTTPS_PROXY_SUPPORT
+  if(proxytype == CURLPROXY_HTTPS) {
+    failf(data, "Unsupported proxy \'%s\'"
+                ", libcurl is built without the HTTPS-proxy support.", proxy);
+    return CURLE_NOT_BUILT_IN;
+  }
+#endif
+
   sockstype = proxytype == CURLPROXY_SOCKS5_HOSTNAME ||
               proxytype == CURLPROXY_SOCKS5 ||
               proxytype == CURLPROXY_SOCKS4A ||
@@ -4980,6 +4996,12 @@ static CURLcode parse_proxy(struct Curl_easy *data,
       /* None given in the proxy string, then get the default one if it is
          given */
       port = data->set.proxyport;
+    else {
+      if(proxytype == CURLPROXY_HTTPS)
+        port = CURL_DEFAULT_HTTPS_PROXY_PORT;
+      else
+        port = CURL_DEFAULT_PROXY_PORT;
+    }
   }
 
   if(*proxyptr) {
@@ -5407,11 +5429,16 @@ static CURLcode parse_remote_port(struct Curl_easy *data,
       *portptr = '\0'; /* cut off the name there */
       conn->remote_port = curlx_ultous(port);
     }
-    else
+    else {
+      if(rest[0]) {
+        failf(data, "Illegal port number");
+        return CURLE_URL_MALFORMAT;
+      }
       /* Browser behavior adaptation. If there's a colon with no digits after,
          just cut off the name there which makes us ignore the colon and just
          use the default port. Firefox and Chrome both do that. */
       *portptr = '\0';
+    }
   }
 
   /* only if remote_port was not already parsed off the URL we use the
@@ -5631,6 +5658,9 @@ static CURLcode parse_connect_to_string(struct Curl_easy *data,
   int host_match = FALSE;
   int port_match = FALSE;
 
+  *host_result = NULL;
+  *port_result = -1;
+
   if(*ptr == ':') {
     /* an empty hostname always matches */
     host_match = TRUE;
@@ -5693,9 +5723,9 @@ static CURLcode parse_connect_to_slist(struct Curl_easy *data,
 {
   CURLcode result = CURLE_OK;
   char *host = NULL;
-  int port = 0;
+  int port = -1;
 
-  while(conn_to_host && !host) {
+  while(conn_to_host && !host && port == -1) {
     result = parse_connect_to_string(data, conn, conn_to_host->data,
                                      &host, &port);
     if(result)
@@ -5714,7 +5744,7 @@ static CURLcode parse_connect_to_slist(struct Curl_easy *data,
     else {
       /* no "connect to host" */
       conn->bits.conn_to_host = FALSE;
-      free(host);
+      Curl_safefree(host);
     }
 
     if(port >= 0) {
@@ -5725,6 +5755,7 @@ static CURLcode parse_connect_to_slist(struct Curl_easy *data,
     else {
       /* no "connect to port" */
       conn->bits.conn_to_port = FALSE;
+      port = -1;
     }
 
     conn_to_host = conn_to_host->next;
@@ -5767,18 +5798,22 @@ static CURLcode resolve_server(struct Curl_easy *data,
       hostaddr = calloc(1, sizeof(struct Curl_dns_entry));
       if(!hostaddr)
         result = CURLE_OUT_OF_MEMORY;
-      else if((hostaddr->addr = Curl_unix2addr(path)) != NULL)
-        hostaddr->inuse++;
       else {
-        /* Long paths are not supported for now */
-        if(strlen(path) >= sizeof(((struct sockaddr_un *)0)->sun_path)) {
-          failf(data, "Unix socket path too long: '%s'", path);
-          result = CURLE_COULDNT_RESOLVE_HOST;
+        int longpath=0;
+        hostaddr->addr = Curl_unix2addr(path, &longpath);
+        if(hostaddr->addr)
+          hostaddr->inuse++;
+        else {
+          /* Long paths are not supported for now */
+          if(longpath) {
+            failf(data, "Unix socket path too long: '%s'", path);
+            result = CURLE_COULDNT_RESOLVE_HOST;
+          }
+          else
+            result = CURLE_OUT_OF_MEMORY;
+          free(hostaddr);
+          hostaddr = NULL;
         }
-        else
-          result = CURLE_OUT_OF_MEMORY;
-        free(hostaddr);
-        hostaddr = NULL;
       }
     }
     else
@@ -6133,8 +6168,8 @@ static CURLcode create_conn(struct Curl_easy *data,
     }
   }
 
-  if(data->set.str[STRING_SOCKS_PROXY]) {
-    socksproxy = strdup(data->set.str[STRING_SOCKS_PROXY]);
+  if(data->set.str[STRING_PRE_PROXY]) {
+    socksproxy = strdup(data->set.str[STRING_PRE_PROXY]);
     /* if global socks proxy is set, this is it */
     if(NULL == socksproxy) {
       failf(data, "memory shortage");
