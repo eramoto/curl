@@ -1246,7 +1246,7 @@ a domain which contains the hostname, or the hostname itself. For example,
 local.com would match local.com, local.com:80, and www.local.com, but not
 www.notlocal.com.
 
-Since 7.52.0, This option overrides the environment variables that disable
+Since 7.52.1, This option overrides the environment variables that disable
 the proxy. If there's an environment variable disabling a proxy, you can set
 noproxy list to \&"" to override it.
 
@@ -2471,7 +2471,7 @@ Sets the proxy server to use if no protocol-specific proxy is set.
 list of host names that shouldn't go through any proxy. If set to a asterisk
 \&'*' only, it matches all hosts.
 
-Since 7.52.0, this environment variable disable the proxy even if specify
+Since 7.52.1, this environment variable disable the proxy even if specify
 \fI-x, --proxy\fP option. That is
 .B NO_PROXY=direct.example.com curl -x http://proxy.example.com
 .B http://direct.example.com
